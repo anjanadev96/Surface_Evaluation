@@ -53,8 +53,8 @@ __device__ __forceinline__ void basis_funs(int uspan_i, float u, int p, float* U
 
 
 __global__ void surf_cuda_pre_compute_basis_kernel(
-    torch::PackedTensorAccessor<int,1,torch::RestrictPtrTraits,size_t> uspan,
-    torch::PackedTensorAccessor<int,1,torch::RestrictPtrTraits,size_t> vspan,
+    torch::PackedTensorAccessor<int,2,torch::RestrictPtrTraits,size_t> uspan,
+    torch::PackedTensorAccessor<int,2,torch::RestrictPtrTraits,size_t> vspan,
     // torch::PackedTensorAccessor<float,2,torch::RestrictPtrTraits,size_t> Nu,
     torch::PackedTensorAccessor<float,1,torch::RestrictPtrTraits,size_t> u,
     torch::PackedTensorAccessor<float,1,torch::RestrictPtrTraits,size_t> v,
@@ -80,8 +80,8 @@ __global__ void surf_cuda_pre_compute_basis_kernel(
       
       uspan[i][j] = find_span(n, p, u[i], U_ptr);
       vspan[i][j] = find_span(m, q, v[j], V_ptr)
-      basis_funs(uspan[i][j],u[i],p,U_ptr,Nu_ptr,i);
-      basis_funs(vspan[i][j],v[j],q,V_ptr,Nv_ptr,j);
+      basis_funs(uspan[i][j],u[i],p,U_ptr,Nu_ptr[i],j);
+      basis_funs(vspan[i][j],v[j],q,V_ptr,Nv_ptr[i],j);
 
       }
     }
@@ -90,8 +90,8 @@ __global__ void surf_cuda_pre_compute_basis_kernel(
 
 __global__ void surf_cuda_forward_kernel(
   torch::PackedTensorAccessor<float,4,torch::RestrictPtrTraits,size_t> ctrl_pts,
-  torch::PackedTensorAccessor<int,1,torch::RestrictPtrTraits,size_t> uspan,
-  torch::PackedTensorAccessor<int,1,torch::RestrictPtrTraits,size_t> vspan,
+  torch::PackedTensorAccessor<int,2,torch::RestrictPtrTraits,size_t> uspan,
+  torch::PackedTensorAccessor<int,2,torch::RestrictPtrTraits,size_t> vspan,
   torch::PackedTensorAccessor<float,3,torch::RestrictPtrTraits,size_t> Nu,
   torch::PackedTensorAccessor<float,3,torch::RestrictPtrTraits,size_t> Nv,
   torch::PackedTensorAccessor<float,1,torch::RestrictPtrTraits,size_t> u,
@@ -116,8 +116,8 @@ __global__ void surf_cuda_forward_kernel(
 
 
   if(k < ctrl_pts_size )
-  { if (i< u_size )
-    { if(j < v_size )
+  { if (j < v_size )
+    { if (i < u_size )
       { 
 
         for (int d=0; d<=_dimension; d++)
@@ -130,7 +130,66 @@ __global__ void surf_cuda_forward_kernel(
               }
             
             
-            surface[k][i][j][d] = Nv[i][j][l]*temp[l][d];
+            surface[k][i][j][d] = surface[k][i][j][d] + Nv[i][j][l]*temp[l][d];
+
+            }
+
+          
+
+          }
+  
+      }
+
+    }
+  }
+ 
+}
+   
+__global__ void surf_cuda_backward_kernel(
+  torch::PackedTensorAccessor<float,4,torch::RestrictPtrTraits,size_t> grad_output,
+  torch::PackedTensorAccessor<float,4,torch::RestrictPtrTraits,size_t> ctrl_pts,
+  torch::PackedTensorAccessor<int,2,torch::RestrictPtrTraits,size_t> uspan,
+  torch::PackedTensorAccessor<int,2,torch::RestrictPtrTraits,size_t> vspan,
+  torch::PackedTensorAccessor<float,3,torch::RestrictPtrTraits,size_t> Nu,
+  torch::PackedTensorAccessor<float,3,torch::RestrictPtrTraits,size_t> Nv,
+  torch::PackedTensorAccessor<float,1,torch::RestrictPtrTraits,size_t> u,
+  torch::PackedTensorAccessor<float,1,torch::RestrictPtrTraits,size_t> v,
+  torch::PackedTensorAccessor<float,4,torch::RestrictPtrTraits,size_t> grad_ctrl_pts,
+  torch::PackedTensorAccessor<float,2,torch::RestrictPtrTraits,size_t> grad_temp,
+  // int* uspan,
+  // float* Nu,
+  int m,
+  int n,
+  int p,
+  int q,
+  int _dimension,
+  unsigned int grad_output_size,
+  unsigned int u_size,
+  unsigned int v_size){
+
+  unsigned int k = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int i = blockIdx.y * blockDim.y + threadIdx.y;
+  unsigned int j = blockIdx.z * blockDim.z + threadIdx.z;
+  // std::printf("Hello from k %d, i %d, l %d\n", k,i,l);
+
+
+  if(k < grad_output_size )
+  { if ( j< v_size )
+    { if( i < u_size )
+      { 
+
+        for (int d=0; d<=_dimension; d++)
+          {
+            for (int l = 0; l<=q; l++)
+            {   grad_temp[l][d] = Nv[i][j][l]*grad_output[k][i][j][d];
+              for (int r = 0; r <=p ; r++)
+              { 
+                grad_ctrl_pts[k][ uspan[i][j] - p + r][ vspan[i][j] - q + l ][d] = grad_ctrl_pts[k][ uspan[i][j] - p + r][ vspan[i][j] - q + l ][d] + Nu[i][j][r]*grad_temp[l][d];
+              
+              }
+            
+            
+            
 
             }
 
@@ -147,10 +206,9 @@ __global__ void surf_cuda_forward_kernel(
    
 
 
-   
 
 
-}
+} //namespace end
 
 
 
@@ -172,8 +230,6 @@ std::vector<torch::Tensor> surf_cuda_pre_compute_basis(
     torch::Tensor v,
     torch::Tensor U,
     torch::Tensor V,
-    // torch::Tensor uspan,
-    // torch::Tensor Nu,
     int m,
     int n,
     int p,
@@ -187,23 +243,23 @@ std::vector<torch::Tensor> surf_cuda_pre_compute_basis(
     auto options2 = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA, 0).requires_grad(true);
     
     // auto device = torch::device(torch::kCUDA, 1);
-    auto uspan = torch::zeros(u.size(0), options1);
-    auto vspan = torch::zeros(v.size(0), options1);
-    auto Nu = torch::zeros({u.size(0), p + 1}, options2);
-    auto Nv = torch::zeros({v.size(0), q + 1}, options2);
+    auto uspan = torch::zeros({u.size(0), v.size(0)}, options1);
+    auto vspan = torch::zeros({v.size(0), v.size(0)}, options1);
+    auto Nu = torch::zeros({ u.size(0), v.size(0), p + 1}, options2);
+    auto Nv = torch::zeros({u.size(0), v.size(0), q + 1}, options2);
     float* Nu_ptr = (float*)Nu.data_ptr();
     float* Nv_ptr = (float*)Nv.data_ptr();
   
     int u_size = u.size(0);
     int v_size = v.size(0);
   
-    const dim3 block(4, 4, 1);
+    const dim3 block(16, 16, 4);
     const dim3 grid(u_size/4+1, v_size/4+1, 1);
   
     // AT_DISPATCH_FLOATING_TYPES(u.type(), "curve_cuda_pre_compute", ([&] {
       surf_cuda_pre_compute_basis_kernel<<<grid, block>>>(
-          uspan.packed_accessor<int,1,torch::RestrictPtrTraits,size_t>(),
-          vspan.packed_accessor<int,1,torch::RestrictPtrTraits,size_t>(),
+          uspan.packed_accessor<int,2,torch::RestrictPtrTraits,size_t>(),
+          vspan.packed_accessor<int,2,torch::RestrictPtrTraits,size_t>(),
           // Nu.packed_accessor<float,2,torch::RestrictPtrTraits,size_t>(),
           u.packed_accessor<float,1,torch::RestrictPtrTraits,size_t>(),
           v.packed_accessor<float,1,torch::RestrictPtrTraits,size_t>(),
@@ -254,7 +310,7 @@ torch::Tensor surf_cuda_forward(
     unsigned int v_size = v.size(0);
   
     const dim3 block(16, 16, 4);
-    const dim3 grid((ctrl_pts_size)/16+1, (u_size)/16+1, (v_size)/16+1);
+    const dim3 grid((ctrl_pts_size)/4+1, (u_size)/16+1, (v_size)/16+1);
   
   
     surf_cuda_forward_kernel<<<grid, block>>>(
@@ -269,6 +325,8 @@ torch::Tensor surf_cuda_forward(
       temp.packed_accessor<float,2,torch::RestrictPtrTraits,size_t>()
       m, 
       n,  
+      p,
+      q,
       _dimension,
       ctrl_pts_size,
       u_size,
@@ -278,3 +336,63 @@ torch::Tensor surf_cuda_forward(
       return surfaces;
   
     }
+
+
+
+
+
+
+
+    std::vector<torch::Tensor>surf_cuda_backward(
+      torch::Tensor grad_output,
+      torch::Tensor ctrl_pts,
+      torch::Tensor uspan_uv,
+      torch::Tensor vspan_uv,
+      torch::Tensor Nu_uv,
+      torch::Tensor Nv_uv,
+      torch::Tensor u_uv,
+      torch::Tensor v_uv,
+      int m,
+      int n,
+      int p,
+      int q,
+      int _dimension){
+      
+      auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA, 0).requires_grad(true);
+    
+      // float* Nu_ptr = (float*)Nu.data_ptr();
+      // int* uspan_ptr = (int*)uspan.data_ptr();
+      auto grad_ctrl_pts = torch::zeros({ctrl_pts.size(0),ctrl_pts.size(1), ctrl_pts.size(2), _dimension+1}, options);
+      auto grad_temp = torch::zeros({q+1, _dimension+1},options);
+      unsigned int grad_output_size = grad_output.size(0);
+      unsigned int u_size = u.size(0);
+      unsigned int v_size = v.size(0);
+    
+      const dim3 block(16, 16, 4);
+      const dim3 grid((ctrl_pts_size)/4+1, (u_size)/16+1, (v_size)/16+1);
+    
+    
+      surf_cuda_backward_kernel<<<grid, block>>>(
+        grad_output.packed_accessor<float,4,torch::RestrictPtrTraits,size_t>(),
+        ctrl_pts.packed_accessor<float,4,torch::RestrictPtrTraits,size_t>(),
+        uspan.packed_accessor<int,2,torch::RestrictPtrTraits,size_t>(),
+        vspan.packed_accessor<int,2,torch::RestrictPtrTraits,size_t>(),
+        Nu.packed_accessor<float,3,torch::RestrictPtrTraits,size_t>(),
+        Nv.packed_accessor<float,3,torch::RestrictPtrTraits,size_t>(),
+        u.packed_accessor<float,1,torch::RestrictPtrTraits,size_t>(),
+        v.packed_accessor<float,1,torch::RestrictPtrTraits,size_t>(),
+        grad_ctrl_pts.packed_accessor<float,4,torch::RestrictPtrTraits,size_t>(),
+        grad_temp.packed_accessor<float,2,torch::RestrictPtrTraits,size_t>()
+        m, 
+        n,
+        p,
+        q,  
+        _dimension,
+        grad_output_size,
+        u_size,
+        v_size);
+    
+    
+        return surfaces;
+    
+      }
