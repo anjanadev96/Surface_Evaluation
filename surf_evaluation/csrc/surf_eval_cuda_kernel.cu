@@ -212,19 +212,6 @@ __global__ void surf_cuda_backward_kernel(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 std::vector<torch::Tensor> surf_cuda_pre_compute_basis(
     torch::Tensor u,
     torch::Tensor v,
@@ -254,7 +241,7 @@ std::vector<torch::Tensor> surf_cuda_pre_compute_basis(
     int v_size = v.size(0);
   
     const dim3 block(16, 16, 4);
-    const dim3 grid(u_size/4+1, v_size/4+1, 1);
+    const dim3 grid(u_size/32, v_size/32, 1);
   
     // AT_DISPATCH_FLOATING_TYPES(u.type(), "curve_cuda_pre_compute", ([&] {
       surf_cuda_pre_compute_basis_kernel<<<grid, block>>>(
@@ -346,12 +333,12 @@ torch::Tensor surf_cuda_forward(
     std::vector<torch::Tensor>surf_cuda_backward(
       torch::Tensor grad_output,
       torch::Tensor ctrl_pts,
-      torch::Tensor uspan_uv,
-      torch::Tensor vspan_uv,
-      torch::Tensor Nu_uv,
-      torch::Tensor Nv_uv,
-      torch::Tensor u_uv,
-      torch::Tensor v_uv,
+      torch::Tensor uspan,
+      torch::Tensor vspan,
+      torch::Tensor Nu,
+      torch::Tensor Nv,
+      torch::Tensor u,
+      torch::Tensor v,
       int m,
       int n,
       int p,
@@ -393,6 +380,6 @@ torch::Tensor surf_cuda_forward(
         v_size);
     
     
-        return surfaces;
+        return {grad_ctrl_pts};
     
       }
