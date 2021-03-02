@@ -39,7 +39,7 @@ from geomdl.visualization import VisMPL
 
 
 def gen_control_points(no_of_surfaces, no_of_u_ctrl_pts, no_of_v_ctrl_pts,dimension):
-    ctrl_pts = torch.rand(no_of_surfaces,no_of_u_ctrl_pts,no_of_v_ctrl_pts,dimension+1,requires_grad=True)
-    ctrl_pts[:,:,:,dimension] = torch.ones(no_of_surfaces,no_of_u_ctrl_pts,no_of_v_ctrl_pts)
+    ctrl_pts = torch.rand(no_of_surfaces,no_of_u_ctrl_pts,no_of_v_ctrl_pts,dimension+1,requires_grad=True,dtype=torch.float32,device='cuda')
+    ctrl_pts[:,:,:,dimension] = torch.ones(no_of_surfaces,no_of_u_ctrl_pts,no_of_v_ctrl_pts,dtype=torch.float32,device='cuda')
 
     return ctrl_pts

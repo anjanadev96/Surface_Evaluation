@@ -1,0 +1,6 @@
+# ninja log v5
+5	12079	6364143988719095	C:/Users/Anjana/Documents/CUDA_Surf_Eval/build/temp.win-amd64-3.8/Release/surf_evaluation/csrc/surf_eval_cuda.obj	d4b0aaa87a48d899
+1	31431	6364144180486252	C:/Users/Anjana/Documents/CUDA_Surf_Eval/build/temp.win-amd64-3.8/Release/surf_evaluation/csrc/surf_eval_cuda_kernel.obj	a828eadff9f80660
+5	10229	6364144479817616	C:/Users/Anjana/Documents/CUDA_Surf_Eval/build/temp.win-amd64-3.8/Release/surf_evaluation/csrc/surf_eval_cuda.obj	d4b0aaa87a48d899
+4	10395	6364144734445274	C:/Users/Anjana/Documents/CUDA_Surf_Eval/build/temp.win-amd64-3.8/Release/surf_evaluation/csrc/surf_eval_cuda.obj	d4b0aaa87a48d899
+4	10468	6364145552545072	C:/Users/Anjana/Documents/CUDA_Surf_Eval/build/temp.win-amd64-3.8/Release/surf_evaluation/csrc/surf_eval_cuda.obj	d4b0aaa87a48d899
