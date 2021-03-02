@@ -79,7 +79,7 @@ __global__ void surf_cuda_pre_compute_basis_kernel(
       if (j < v_size){
       
       uspan[i][j] = find_span(n, p, u[i], U_ptr);
-      vspan[i][j] = find_span(m, q, v[j], V_ptr)
+      vspan[i][j] = find_span(m, q, v[j], V_ptr);
       basis_funs(uspan[i][j],u[i],p,U_ptr,Nu_ptr[i],j);
       basis_funs(vspan[i][j],v[j],q,V_ptr,Nv_ptr[i],j);
 
