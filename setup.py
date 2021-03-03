@@ -10,9 +10,9 @@ setup(
 
 
 
-        # CppExtension(name='surf_eval_cpp',
-        # sources=['surf_evaluation/csrc/surf_eval.cpp', 'surf_evaluation/csrc/utils.cpp'],
-        # extra_include_paths=['surf_evaluation/csrc/surf_eval.h', 'surf_evaluation/csrc/utils.h'])
+        CppExtension(name='surf_eval_cpp',
+        sources=['surf_evaluation/csrc/surf_eval.cpp', 'surf_evaluation/csrc/utils.cpp'],
+        extra_include_paths=['surf_evaluation/csrc/surf_eval.h', 'surf_evaluation/csrc/utils.h'])
     ],
     cmdclass={
         'build_ext': BuildExtension
